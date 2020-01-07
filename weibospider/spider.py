@@ -9,18 +9,20 @@ class WeiboSpider:
 
     def __init__(self, db: Database = None,
                  path: PathGenerator = None,
-                 session: Session = None):
-        self.db = MongoDB('weibo',
-                          primary_search_key='id') if db is None else db
+                 session: Session = None,
+                 auth: Auth = None):
+        self.db = MongoDB('weibo', primary_key='id') if db is None else db
         self.path = StoreByUserName('./download') if path is None else path
         self.session = Session(timeout=10, retry=5) \
             if session is None else session
 
-        auth = Auth()
+        if auth is None:
+            auth = Auth()
         self.token = auth.token.token
         self.client = Client()
 
     def list(self, page=1):
+        items = []
         running = True
         while running:
             data = self.client.favorites.get(access_token=self.token, page=page)
@@ -28,11 +30,13 @@ class WeiboSpider:
                 break
             for item in data.favorites:
                 if item.status.id not in self.db:
-                    yield item.status
+                    items.append(item.status)
                 else:
                     running = False
                     break
             page += 1
+        items.reverse()
+        return items
 
     def download(self, status):
         if 'deleted' not in status:
